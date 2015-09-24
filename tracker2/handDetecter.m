@@ -1,5 +1,6 @@
 clear all;
 close all;
+
 % Create a cascade detector object.
 handDetector = vision.CascadeObjectDetector('D:\tracker2\haar\fist.xml','MergeThreshold',10);
 
@@ -27,7 +28,7 @@ figure, imshow(videoOut), title('Detected face');
 
 % Get the skin tone information by extracting the Hue from the video frame
 % converted to the HSV color space
-[~,hueChannel,~] = rgb2hsv(videoFrame)
+[~,~,hueChannel] = rgb2hsv(videoFrame)
 
 N =size(bbox)
 
@@ -80,7 +81,7 @@ while true
    % videoFrame = step(videoFileReader);
         
     % RGB -> HSV
-    [~,hueChannel,~] = rgb2hsv(videoFrame);
+    [~,~,hueChannel] = rgb2hsv(videoFrame);
     
     % RGB -> LAB
     %lab = rgb2lab(videoFrame);
