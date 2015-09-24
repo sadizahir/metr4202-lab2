@@ -1,7 +1,7 @@
 clear all;
 close all;
 % Create a cascade detector object.
-handDetector = vision.CascadeObjectDetector('D:\tracker2\hand_detector.xml','MergeThreshold',20);
+handDetector = vision.CascadeObjectDetector('D:\tracker2\haar\fist.xml','MergeThreshold',10);
 
 INPUT_LIMITS = [0 0 0; .8 .8 0.5];
 OUTPUT_LIMITS = []; %[0.2 0.2 0.2; 1 1 1]
@@ -10,7 +10,7 @@ GAMMA = 1;
 
 % Read a video frame from CAM and run the detector.
 cam = webcam;
-videoFrame = (snapshot(cam)); % comment out if you don't want mirror image  
+videoFrame = fliplr((snapshot(cam))); % comment out if you don't want mirror image  
 %videoFrame = imadjust(videoFrame1,INPUT_LIMITS,OUTPUT_LIMITS,GAMMA);
 
 bbox = step(handDetector, videoFrame); % grab the bounding box for a possible region with hand in it
@@ -22,12 +22,12 @@ frameSize = size(videoFrame);
 %bbox            = step(handDetector, videoFrame);
 
 % Draw the returned bounding box around the detected face.
-videoOut = insertObjectAnnotation(videoFrame,'rectangle',bbox,'Face');
+videoOut = insertObjectAnnotation(videoFrame,'rectangle',bbox,'Hand');
 figure, imshow(videoOut), title('Detected face');
 
 % Get the skin tone information by extracting the Hue from the video frame
 % converted to the HSV color space
-[hueChannel,~,~] = rgb2hsv(videoFrame)
+[~,hueChannel,~] = rgb2hsv(videoFrame)
 
 N =size(bbox)
 
@@ -42,16 +42,18 @@ for i = 1:Num_of_BBox
     % Detect the nose within the face region. The nose provides a more accurate
     % measure of the skin tone because it does not contain any background
     % pixels.
-    palmDetector = vision.CascadeObjectDetector('D:\tracker2\palm_detector.xml','MergeThreshold',2, 'UseROI', true); %'D:\tracker2\palm_detector.xml'
+    palmDetector = vision.CascadeObjectDetector('D:\tracker2\haar\palm.xml','MergeThreshold',2, 'UseROI', true); %'D:\tracker2\palm_detector.xml'
     %palmBBox(i)  = 
     step(palmDetector, videoFrame, bbox(i,:));
+    
+    N =size(bbox)
     
     % Create a tracker object.
     tracker{i} = vision.HistogramBasedTracker;
     
     % Initialize the tracker histogram using the Hue channel pixels from the
     % nose.
-    initializeObject(tracker{i}, hueChannel, bbox(i,:),20);
+    initializeObject(tracker{i}, hueChannel, bbox(i,:),50);
 end
 
 % Create the video player object. (from CAM)
@@ -70,7 +72,7 @@ videoPlayer = vision.VideoPlayer('Position', [100 100 [frameSize(2), frameSize(1
 while true
 
     % Extract the next video frame (from cam)
-    videoFrame = (snapshot(cam));
+    videoFrame = fliplr((snapshot(cam)));
     
     %videoFrame = imadjust(videoFrame1,INPUT_LIMITS,OUTPUT_LIMITS,GAMMA);
  
@@ -78,7 +80,7 @@ while true
    % videoFrame = step(videoFileReader);
         
     % RGB -> HSV
-    [hueChannel,~,~] = rgb2hsv(videoFrame);
+    [~,hueChannel,~] = rgb2hsv(videoFrame);
     
     % RGB -> LAB
     %lab = rgb2lab(videoFrame);
