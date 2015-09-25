@@ -36,6 +36,8 @@ aflags = []; % matrix containing the bboxes for each active tracker
 % N.B.: the above three things should have the same amount of elements
 % because they are associative with each other!
 
+flag = 1
+
 while true % infinite loop to capture images, find hands, and track them
 %for qwe = startImg:stopImg
    img = fliplr(snapshot(cam)); % capture the image
@@ -71,6 +73,7 @@ while true % infinite loop to capture images, find hands, and track them
            mimg = insertShape(mimg, 'FilledPolygon', bboxP, 'Color', 'Black', 'Opacity', 1.0);
        end
    end
+  
    
    % Now we have a picture! Step 1: Detect some hands using CascadeObjectDetector
    for i = 1:size(rotations, 2) % iterate through each element of the rotations vector
@@ -85,10 +88,11 @@ while true % infinite loop to capture images, find hands, and track them
            btrack(size(btrack,1)+1,:) =  bbox(j,:);
        end
    end
+
    
-   for i = 1:size(btrack, 1)
-        img = insertShape(img, 'Rectangle', btrack(i,:), 'LineWidth', 2);
-   end
+%    for i = 1:size(btrack, 1)
+%         img = insertShape(img, 'Rectangle', btrack(i,:), 'LineWidth', 2);
+%    end
       
    % Now we have a group of bounding boxes in btrack that describe detected
    % and not currently-tracked-by-KLT. We need to track them now, so we
@@ -102,12 +106,15 @@ while true % infinite loop to capture images, find hands, and track them
        active{size(active,2)+1} = pointTracker; % add it to the active tracker array
        activePoints{size(activePoints,2)+1} = points; % add the points to the associated array; these are the most recent "old" points found by tracker
        atrack{size(atrack,2)+1} = bbox2points(sbox); % bbox for that particular box which generated the tracker
-       aflags(size(aflags,2)+1) = 1;
+       aflags(size(aflags,2)+1) = 1; % flag to denote that this tracker is active
    end
    
    % Now that we've initialised new trackers, let's update all the trackers
    % we have and push them to the image
    for i = 1:size(active,2) % iterate through each tracker individually
+       if aflags(i) == 0
+           continue
+       end
        oldPoints = activePoints{i};
        pointTracker = active{i};
        bboxPoints = atrack{i};
@@ -115,31 +122,36 @@ while true % infinite loop to capture images, find hands, and track them
        visiblePoints = points(isFound, :);
        oldInliers = oldPoints(isFound, :);
        
-    if size(visiblePoints, 1) >= 30 % need at least 2 points
+        if size(visiblePoints, 1) >= 5 % need at least 2 points
 
-        % Estimate the geometric transformation between the old points
-        % and the new points and eliminate outliers
-        [xform, oldInliers, visiblePoints] = estimateGeometricTransform(...
-            oldInliers, visiblePoints, 'similarity', 'MaxDistance', 4);
+            % Estimate the geometric transformation between the old points
+            % and the new points and eliminate outliers
+            [xform, oldInliers, visiblePoints] = estimateGeometricTransform(...
+                oldInliers, visiblePoints, 'similarity', 'MaxDistance', 4);
 
-        % Apply the transformation to the bounding box points
-        bboxPoints = transformPointsForward(xform, bboxPoints);
+            % Apply the transformation to the bounding box points
+            bboxPoints = transformPointsForward(xform, bboxPoints);
 
-        % Insert a bounding box around the object being tracked
-        bboxPolygon = reshape(bboxPoints', 1, []);
-        img = insertShape(img, 'Polygon', bboxPolygon, ...
-            'LineWidth', 2);
+            % Insert a bounding box around the object being tracked
+            bboxPolygon = reshape(bboxPoints', 1, []);
+            img = insertShape(img, 'Polygon', bboxPolygon, ...
+                'LineWidth', 2);
 
-        % Display tracked points
-        img = insertMarker(img, visiblePoints, '+', ...
-            'Color', 'white');
+            % Display tracked points
+            img = insertMarker(img, visiblePoints, '+', ...
+                'Color', 'white');
 
-        % Reset the points
-        oldPoints = visiblePoints;
-        setPoints(pointTracker, oldPoints);
-    else
-        aflags(i) = 0;
-    end
+            % Reset the points
+            oldPoints = visiblePoints;
+            setPoints(pointTracker, oldPoints);
+            
+            % Change the matrix up
+            activePoints{i} = oldPoints;
+            active{i} = pointTracker;
+            atrack{i} = bboxPoints;
+        else
+            aflags(i) = 0;
+        end
    end
    
    imshow(img, 'InitialMagnification', 300);
