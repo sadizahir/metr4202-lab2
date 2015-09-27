@@ -1,26 +1,29 @@
 % Initialisation
 clear; % it's always good to clear the workspace!
+load('local.mat');
+
 load('calib_img/palm_up_north/pun_pdn_positives_4.mat'); % positives for palm-up and palm-down north
 load('calib_img/palm_up_north/puo_positives.mat'); % positives for only the palm area (palm-up)
 negativeFolder = fullfile('calib_img', 'palm_up_north', 'negative'); % negative images
 
 % Train the hand detector and palm detector
-trainCascadeObjectDetector('pun_detector.xml', pun_pdn_positives_4, negativeFolder, 'FalseAlarmRate', 0.5, 'NumCascadeStages', 16);
-trainCascadeObjectDetector('puo_detector.xml', puo_positives, negativeFolder, 'FalseAlarmRate', 0.5, 'NumCascadeStages', 8);
+trainCascadeObjectDetector('pun_detector.xml', pun_pdn_positives_4, negativeFolder, 'FalseAlarmRate', 0.5, 'NumCascadeStages', 17);
 
 % Start up the detectors
 detector = vision.CascadeObjectDetector('pun_detector.xml', 'MergeThreshold', 20);
-palmDetector = vision.CascadeObjectDetector('puo_detector.xml');
+%penDetector = vision.CascadeObjectDetector('tracker2\haar\pen.xml', 'MergeThreshold', 4);
+penDetector = vision.CascadeObjectDetector('pen_blargghhh.xml', 'MergeThreshold', 4);
 
 % Create and setup the camera
-cam = webcam(2);
-cam.resolution = '320x240';
+%cam = webcam(2);
+%cam.resolution = '320x240';
 
 % Setup the Kinect
-%kinect = imaq.VideoDevice('kinectv2imaq', 1);
+vid1 = imaq.VideoDevice('kinectv2imaq', 1);
+vid2 = imaq.VideoDevice('kinectv2imaq', 2);
 
 % Settings
-rotations = (0); % vector of which rotations to make on the input image when searching for a hand
+rotations = [0]; % vector of which rotations to make on the input image when searching for a hand
 
 % For testing
 testPath = 'calib_img\palm_up_north\histogram_test\Image';
@@ -36,12 +39,13 @@ aflags = []; % matrix containing the bboxes for each active tracker
 % N.B.: the above three things should have the same amount of elements
 % because they are associative with each other!
 
-flag = 1
+flag = 1;
 
 while true % infinite loop to capture images, find hands, and track them
 %for qwe = startImg:stopImg
-   img = fliplr(snapshot(cam)); % capture the image
-   %img = imresize(step(kinect), 0.2);
+   %img = fliplr(snapshot(cam)); % capture the image
+   img = fliplr(imresize(step(vid1), [240 450]));
+   depth_img = fliplr(imresize(step(vid2), [240 450])*4.5);
    
 %    if debug
 %     img = imread(strcat(testPath, int2str(qwe), '.png'));
@@ -83,9 +87,10 @@ while true % infinite loop to capture images, find hands, and track them
        % TODO: Unrotate the bounding boxes somehow, so they are correct to img and not rimg
        % TODO: Check if bounding box is already in the btrack
        for j = 1:size(bbox, 1)
-           cx = round(size(mimg, 2)/2); % grab centre co-ordinates
-           cy = round(size(mimg, 1)/2); % we'll use this later
-           btrack(size(btrack,1)+1,:) =  bbox(j,:);
+           sbox = bbox(j,:);
+           rbbox = sbox;
+           %rbbox = bbox_flip(sbox, angle, size(mimg, 1)); % unrotate bbox
+           btrack(size(btrack,1)+1,:) =  rbbox;
        end
    end
 
@@ -122,7 +127,7 @@ while true % infinite loop to capture images, find hands, and track them
        visiblePoints = points(isFound, :);
        oldInliers = oldPoints(isFound, :);
        
-        if size(visiblePoints, 1) >= 5 % need at least 2 points
+        if size(visiblePoints, 1) >= 30 % need at least 2 points
 
             % Estimate the geometric transformation between the old points
             % and the new points and eliminate outliers
@@ -136,10 +141,35 @@ while true % infinite loop to capture images, find hands, and track them
             bboxPolygon = reshape(bboxPoints', 1, []);
             img = insertShape(img, 'Polygon', bboxPolygon, ...
                 'LineWidth', 2);
+            
+            % Figure out the center of the box
+            xmin = min(bboxPoints(:, 1));
+            xmax = max(bboxPoints(:, 1));
+            ymin = min(bboxPoints(:, 2));
+            ymax = max(bboxPoints(:, 2));
+            width = xmax - xmin;
+            height = ymax - ymin;
+            xcent = xmin + width/2;
+            ycent = ymin + height/2;
+            
+            
+            iP = [xcent, ycent];
+            worldPoints = pointsToWorld(cameraParams, R, t, iP);
+            
+            wP = [worldPoints 0];
+            relToCam = wP;
+            %wP*R+t; %3x1 matrix  - 3 is wrong
+            
+            
+            depth_point = depth_img(ceil(ycent), ceil(xcent));
+            depthlabel = strcat('[', num2str(relToCam(1)/10), ', ', num2str(relToCam(2)/10), ', ', round(num2str(depth_point*100-camWldC(3)/10)), ']');
+%             depthlabel = strcat(round(num2str(depth_point*100)), ' cm');
+%               , ', Depth:', round(num2str(depth_point*100)), ' cm'
+            
+            img = insertText(img, [xcent ycent], depthlabel, 'AnchorPoint', 'Center');
 
             % Display tracked points
-            img = insertMarker(img, visiblePoints, '+', ...
-                'Color', 'white');
+            %img = insertMarker(img, visiblePoints, '+', 'Color', 'white');
 
             % Reset the points
             oldPoints = visiblePoints;
@@ -154,6 +184,11 @@ while true % infinite loop to capture images, find hands, and track them
         end
    end
    
+   
+   
+   img = insertMarker(img, corner);
+   pbbox = step(penDetector, img);
+   img = insertObjectAnnotation(img, 'rectangle', pbbox, 'Pen', 'Color', 'cyan');
    imshow(img, 'InitialMagnification', 300);
    
 end

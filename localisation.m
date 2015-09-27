@@ -1,37 +1,18 @@
 clear;
-
-%CALIBRATION
-% Define images to process
-imageFileNames = {'C:\Users\Kate\Documents\metr4202-lab2\calib_example\Image1.png',...
-    'C:\Users\Kate\Documents\metr4202-lab2\calib_example\Image2.png',...
-    'C:\Users\Kate\Documents\metr4202-lab2\calib_example\Image3.png',...
-    'C:\Users\Kate\Documents\metr4202-lab2\calib_example\Image4.png',...
-    'C:\Users\Kate\Documents\metr4202-lab2\calib_example\Image5.png',...
-    'C:\Users\Kate\Documents\metr4202-lab2\calib_example\Image6.png',...
-};
-
-% Detect checkerboards in images
-[imagePoints, boardSize, imagesUsed] = detectCheckerboardPoints(imageFileNames);
-imageFileNames = imageFileNames(imagesUsed);
-
-% Generate world coordinates of the corners of the squares
-squareSize = 20;  % in units of 'mm'
-worldPoints = generateCheckerboardPoints(boardSize, squareSize);
-
-% Calibrate the camera
-[cameraParams, imagesUsed, estimationErrors] = estimateCameraParameters(imagePoints, worldPoints, ...
-    'EstimateSkew', false, 'EstimateTangentialDistortion', false, ...
-    'NumRadialDistortionCoefficients', 2, 'WorldUnits', 'mm');
+load('cal.mat');
 
 
-% filename = strcat('C:\Users\Kate\Documents\metr4202-lab2\depth','.png');
-% filename = strcat('C:\Users\Kate\Documents\metr4202-lab2\locate1','.png');
-% filename = strcat('C:\Users\Kate\Documents\metr4202-lab2\pitch','.png');
-% filename = strcat('C:\Users\Kate\Documents\metr4202-lab2\angle1','.png');
-% filename = strcat('C:\Users\Kate\Documents\metr4202-lab2\multiangle','.png');
-% filename = strcat('C:\Users\Kate\Documents\metr4202-lab2\roll','.png');
-% filename = strcat('C:\Users\Kate\Documents\metr4202-lab2\yaw','.png');
-filename = strcat('C:\Users\Kate\Documents\metr4202-lab2\allAngle','.png');
+vid1 = imaq.VideoDevice('kinectv2imaq', 1);
+%preview(vid1);
+%pause(10);
+
+image_capture = imresize(fliplr(step(vid1)), [240 450]);  % take camera shot
+filename = strcat('C:\Users\Sadi\github\metr4202-lab2\calib_example\Original.png');
+
+%     image_capture = imresize(step(vid1), [240 450]);  % take camera shot
+
+imwrite(image_capture,filename)
+release(vid1);
 
 
 imOrig = imread(filename);
@@ -124,14 +105,15 @@ angleY3 = atand(abs(abs(camWld9(2))-abs(camWld10(2)))/(abs(abs(camWld9(1))-abs(c
 angleY4 = atand(abs(abs(camWld5(2))-abs(camWld6(2)))/(abs(abs(camWld5(1))-abs(camWld6(1)))));
 yaw = (angleY1+angleY2+angleY3+angleY4)/4
 
-iP = [imagePoints1(36,:); imagePoints1(40,:)];
+%Pose
+pose = atand(abs(camWld1(1))/abs(camWld1(3)));
+
+%iP = [imagePoints1(36,:); imagePoints1(40,:)];
 
 % imshow(insertMarker(im, imagePoints1(5,:)));
 
 %Get frame origin co-ordinate
-imagePoints1(1,1)
-cX = imagePoints1(1,1)- 40%hypot(20, 20)*sind(yaw)
-corner = [cX, imagePoints1(1,2)+40];
+corner = [imagePoints1(1,1), imagePoints1(1,2)];
 
 
 
@@ -142,7 +124,8 @@ x = camWldC(3); % x is the depth (z in world co-ordinates)
 y = camWldC(1); % y is the horizontal value (x in world co-ordinates)
 z = camWldC(2); % z is the vertical value (y in world co-ordinates)
 
-CentralFrame = [camWldC(3), camWldC(1), camWldC(2)];
-fprintf('x: %g, y: %g, z: %g. Pitch: %g, Roll: %g, Yaw: %g\n', x,y,z,pitch,roll,yaw);
+centralFrame = [camWldC(3), camWldC(1), camWldC(2)];
+fprintf('x: %g, y: %g, z: %g.\nPose: %g.\nPitch: %g, Roll: %g, Yaw: %g.\n', x,y,z,pose,pitch,roll,yaw);
 
-imshow(insertMarker(im, imagePoints1));
+imshow(insertMarker(im, corner));
+save('local.mat', 'cameraParams', 'worldPoints', 'R', 't', 'corner', 'centralFrame', 'camWldC');
